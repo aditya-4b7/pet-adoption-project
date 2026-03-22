@@ -7,7 +7,7 @@ module "vpc" {
 }
 
 module "bastion" {
-  source        = "../../modules/bastion"
+  source        = "../../../modules/bastion"
   vpc_id        = module.vpc.vpc_id
   public_subnet = module.vpc.public_subnets[0]
   key_name      = var.key_name
@@ -26,7 +26,7 @@ module "acm" {
 }
 
 module "asg" {
-  source           = "../../modules/asg"
+  source           = "../../../modules/asg"
   subnet_ids       = module.vpc.private_subnets
   target_group_arn = module.alb.target_group_arn
   key_name         = var.key_name
