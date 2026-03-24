@@ -1,0 +1,29 @@
+- hosts: all
+  become: yes
+  vars:
+    container_name: app
+    container_port: 8080
+
+  tasks:
+
+    - name: Pull latest Docker image
+      command: docker pull {{ image }}
+
+    - name: Stop existing container (if running)
+      command: docker rm -f {{ container_name }}
+      ignore_errors: yes
+
+    - name: Run new container
+      command: >
+        docker run -d
+        -p {{ container_port }}:{{ container_port }}
+        --name {{ container_name }}
+        {{ image }}
+
+    - name: Verify container is running
+      command: docker ps
+      register: docker_output
+
+    - name: Show running containers
+      debug:
+        var: docker_output.stdout

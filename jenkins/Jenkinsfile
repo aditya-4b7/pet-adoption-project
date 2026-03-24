@@ -1,16 +1,152 @@
 pipeline {
-  agent any
+    agent any
 
-  stages {
-    stage('Build') {
-      steps {
-        sh 'mvn clean package'
-      }
+    environment {
+        APP_NAME        = "java-app"
+        DOCKER_IMAGE    = "nexus-ip:8081/java-app"
+        NEXUS_URL       = "http://nexus-ip:8081"
+        SONARQUBE_ENV   = "sonarqube"
+        AWS_REGION      = "us-east-1"
     }
-    stage('Docker') {
-      steps {
-        sh 'docker build -t myapp .'
-      }
+
+    tools {
+        maven "maven"
+        jdk "jdk17"
     }
-  }
+
+    stages {
+
+        # -------------------------
+        # 1. CLONE CODE
+        # -------------------------
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/your-repo/java-app.git'
+            }
+        }
+
+        # -------------------------
+        # 2. BUILD (MAVEN)
+        # -------------------------
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        # -------------------------
+        # 3. UNIT TEST (OPTIONAL)
+        # -------------------------
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        # -------------------------
+        # 4. SONARQUBE SCAN
+        # -------------------------
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv("${SONARQUBE_ENV}") {
+                    sh '''
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=java-app \
+                    -Dsonar.projectName=java-app
+                    '''
+                }
+            }
+        }
+
+        # -------------------------
+        # 5. QUALITY GATE
+        # -------------------------
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        # -------------------------
+        # 6. BUILD DOCKER IMAGE
+        # -------------------------
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} ."
+            }
+        }
+
+        # -------------------------
+        # 7. TRIVY SCAN
+        # -------------------------
+        stage('Security Scan (Trivy)') {
+            steps {
+                sh """
+                trivy image --exit-code 1 --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                """
+            }
+        }
+
+        # -------------------------
+        # 8. LOGIN TO NEXUS
+        # -------------------------
+        stage('Login to Nexus') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh "echo $PASS | docker login nexus-ip:8081 -u $USER --password-stdin"
+                }
+            }
+        }
+
+        # -------------------------
+        # 9. PUSH IMAGE TO NEXUS
+        # -------------------------
+        stage('Push to Nexus') {
+            steps {
+                sh """
+                docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${DOCKER_IMAGE}:latest
+                docker push ${DOCKER_IMAGE}:latest
+                """
+            }
+        }
+
+        # -------------------------
+        # 10. DYNAMIC INVENTORY (ASG)
+        # -------------------------
+        stage('Fetch EC2 IPs (ASG)') {
+            steps {
+                sh '''
+                chmod +x scripts/dynamic_inventory.sh
+                ./scripts/dynamic_inventory.sh
+                '''
+            }
+        }
+
+        # -------------------------
+        # 11. DEPLOY USING ANSIBLE
+        # -------------------------
+        stage('Deploy to EC2 (ASG)') {
+            steps {
+                sh """
+                ansible-playbook -i ansible/inventory.ini ansible/deploy.yml \
+                --extra-vars "image=${DOCKER_IMAGE}:latest"
+                """
+            }
+        }
+    }
+
+    # -------------------------
+    # POST ACTIONS
+    # -------------------------
+    post {
+        success {
+            echo "✅ Deployment Successful!"
+        }
+        failure {
+            echo "❌ Pipeline Failed!"
+        }
+    }
 }

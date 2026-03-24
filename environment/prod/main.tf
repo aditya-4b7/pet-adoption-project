@@ -14,13 +14,13 @@ module "bastion" {
 }
 
 module "alb" {
-  source      = "../../modules/alb"
+  source      = "../../../modules/alb"
   vpc_id      = module.vpc.vpc_id
   subnet_ids  = module.vpc.public_subnets
 }
 
 module "acm" {
-  source    = "../../modules/acm"
+  source    = "../../../modules/acm"
   domain    = var.domain_name
   zone_id   = module.route53.zone_id
 }
@@ -33,20 +33,20 @@ module "asg" {
 }
 
 module "route53" {
-  source      = "../../modules/route53"
+  source      = "../../../modules/route53"
   domain_name = var.domain_name
   alb_dns     = module.alb.alb_dns
   alb_zone_id = module.alb.alb_zone_id
 }
 
 module "sonarqube" {
-  source    = "../../modules/sonarqube"
+  source    = "../../../modules/sonarqube"
   subnet_id = module.vpc.public_subnets[0]
   key_name  = var.key_name
 }
 
 module "nexus" {
-  source    = "../../modules/nexus"
+  source    = "../../../modules/nexus"
   subnet_id = module.vpc.public_subnets[0]
   key_name  = var.key_name
 }
