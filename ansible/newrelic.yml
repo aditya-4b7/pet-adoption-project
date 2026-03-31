@@ -1,0 +1,38 @@
+- hosts: web
+  become: true
+  serial: 1
+  tasks:
+    - name: Skip when New Relic license key is not provided
+      meta: end_host
+      when: newrelic_license_key | default('') | length == 0
+
+    - name: Create New Relic Infra repo file
+      copy:
+        dest: /etc/yum.repos.d/newrelic-infra.repo
+        content: |
+          [newrelic-infra]
+          name=New Relic Infrastructure
+          baseurl=https://download.newrelic.com/infrastructure_agent/linux/yum/el/9/x86_64
+          gpgcheck=0
+          repo_gpgcheck=0
+          enabled=1
+
+    - name: Install New Relic infrastructure agent
+      package:
+        name: newrelic-infra
+        state: present
+
+    - name: Configure New Relic infrastructure agent
+      copy:
+        dest: /etc/newrelic-infra.yml
+        content: |
+          license_key: {{ newrelic_license_key }}
+          display_name: {{ inventory_hostname }}
+      notify: restart newrelic
+
+  handlers:
+    - name: restart newrelic
+      service:
+        name: newrelic-infra
+        state: restarted
+        enabled: true
