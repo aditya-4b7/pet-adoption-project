@@ -27,11 +27,12 @@ env                   = "prod"
 key_name              = "pet-adoption-key"
 domain_name           = "cloud4u.shop"
 hosted_zone_id        = "Z007485728RD8IL8CSEN0"
-allowed_admin_cidr    = "185.156.47.12/32"
+allowed_admin_cidr    = "185.156.47.6/32"
+# allowed_admin_cidr    = "217.79.118.167/32"
 
 bastion_instance_type = "t3.micro"
-jenkins_instance_type = "t3.micro"
-tool_instance_type    = "t3.micro"
+jenkins_instance_type = "m7i-flex.large"
+tool_instance_type    = "m7i-flex.large"
 app_instance_type     = "t3.micro"
 
 desired_capacity      = 1
