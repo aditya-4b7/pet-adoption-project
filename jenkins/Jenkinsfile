@@ -38,18 +38,45 @@ pipeline {
             }
         }
 
+        // stage('Read Terraform Outputs') {
+        //     steps {
+        //         dir("environment/${params.TERRAFORM_ENV}") {
+        //             script {
+        //                 env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
+        //                 env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
+        //                 env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
+        //                 env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
+        //             }
+        //         }
+        //     }
+        // }
+        
         stage('Read Terraform Outputs') {
             steps {
-                dir("environment/${params.TERRAFORM_ENV}") {
-                    script {
+                script {
+                    sh """
+                        cd ${WORKSPACE}
+                        chmod +x scripts/init-env.sh
+                        ./scripts/init-env.sh ${params.TERRAFORM_ENV}
+                    """
+
+                    dir("environment/${params.TERRAFORM_ENV}") {
+                        sh 'terraform init -reconfigure'
+
                         env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
                         env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
                         env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
                         env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
                     }
+
+                    echo "ASG_NAME=${env.ASG_NAME}"
+                    echo "BASTION_PUBLIC_IP=${env.BASTION_PUBLIC_IP}"
+                    echo "NEXUS_URL=${env.NEXUS_URL}"
+                    echo "APPLICATION_URL=${env.APPLICATION_URL}"
                 }
             }
         }
+
 
         stage('Build WAR') {
             steps {
