@@ -63,7 +63,7 @@ pipeline {
                     dir("environment/${params.TERRAFORM_ENV}") {
                         sh 'ls -l'
                         sh 'cat backend.auto.hcl'
-                        sh 'terraform init -reconfigure -backend-config=backend.auto.hcl'
+                        sh 'terraform init -reconfigure '
 
                         env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
                         env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
@@ -90,8 +90,7 @@ pipeline {
 
         stage('OWASP Dependency Check') {
             steps {
-                   sh 'mvn dependency-check:check || true'
-                }
+                sh 'mvn dependency-check:check || true'
             }
             post {
                 always {
