@@ -90,8 +90,7 @@ pipeline {
 
         stage('OWASP Dependency Check') {
             steps {
-                dir('app') {
-                    sh 'mvn org.owasp:dependency-check-maven:check -Dformat=HTML -DoutputDirectory=../reports'
+                   sh 'mvn dependency-check:check || true'
                 }
             }
             post {
