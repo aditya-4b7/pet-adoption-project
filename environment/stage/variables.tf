@@ -20,3 +20,4 @@ variable "az_1" { type = string }
 variable "az_2" { type = string }
 variable "bastion_instance_type" { type = string }
 variable "hosted_zone_id" { type = string }
+variable "jenkins_iam_instance_profile_name" { type = string }
