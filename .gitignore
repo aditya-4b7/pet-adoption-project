@@ -5,8 +5,8 @@
 crash.log
 crash.*.log
 .terraform.lock.hcl
-C:\Users\Gokul Aditya Parise\Devops\pet-adoption-project\environment\stage\terraform.tfvars
-C:\Users\Gokul Aditya Parise\Devops\pet-adoption-project\environment\prod\terraform.tfvars
+environment\stage\terraform.tfvars
+environment\prod\terraform.tfvars
 
 # Ansible Inventory
 ansible/inventory.ini
