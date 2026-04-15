@@ -6,3 +6,6 @@ variable "key_name" { type = string }
 variable "allowed_cidr" { type = string }
 variable "instance_type" { type = string }
 variable "ami_id" { type = string }
+variable "iam_instance_profile_name" {
+    type = string
+}
