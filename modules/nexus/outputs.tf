@@ -24,3 +24,7 @@ output "nexus_sg_id" {
   description = "Security group ID of Nexus"
   value       = aws_security_group.nexus.id
 }
+
+variable "bastion_security_group_id" {
+  type = string
+}

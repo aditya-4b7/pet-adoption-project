@@ -186,6 +186,7 @@ module "sonarqube" {
   allowed_cidr   = var.allowed_admin_cidr
   instance_type  = var.tool_instance_type
   ami_id         = var.ami_id
+  bastion_security_group_id = module.bastion.bastion_sg_id 
 }
 
 module "nexus" {
@@ -198,6 +199,7 @@ module "nexus" {
   allowed_cidr   = var.allowed_admin_cidr
   instance_type  = var.tool_instance_type
   ami_id         = var.ami_id
+  bastion_security_group_id = module.bastion.bastion_sg_id  
 }
 
 module "acm" {

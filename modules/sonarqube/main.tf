@@ -13,7 +13,7 @@ resource "aws_security_group" "sonarqube" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    security_groups = [var.bastion_security_group_id]
   }
 
   ingress {

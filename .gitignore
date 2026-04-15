@@ -6,6 +6,9 @@ crash.log
 crash.*.log
 .terraform.lock.hcl
 
+# Ansible Inventory
+ansible/inventory.ini
+
 # Secrets
 *.pem
 *.key
@@ -14,3 +17,7 @@ crash.*.log
 # OS files
 .DS_Store
 Thumbs.db
+
+# Build files
+build/
+app/target
