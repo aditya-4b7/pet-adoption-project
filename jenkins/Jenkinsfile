@@ -61,7 +61,9 @@ pipeline {
                     """
 
                     dir("environment/${params.TERRAFORM_ENV}") {
-                        sh 'terraform init -reconfigure'
+                        sh 'ls -l'
+                        sh 'cat backend.auto.hcl'
+                        sh 'terraform init -reconfigure -backend-config=backend.auto.hcl'
 
                         env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
                         env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
