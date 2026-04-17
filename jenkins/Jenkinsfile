@@ -95,7 +95,7 @@ pipeline {
             steps {
                 dir('app') {
                     withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        sh 'mvn sonar:sonar -Dsonar.projectKey=pet-adoption -Dsonar.projectName=pet-adoption -Dsonar.login=$SONAR_AUTH_TOKEN'
+                        sh 'mvn sonar:sonar -Dsonar.projectKey=pet-adoption -Dsonar.projectName=pet-adoption -Dsonar.login=$SONAR_AUTH_TOKENssh -i '
                     }
                 }
             }

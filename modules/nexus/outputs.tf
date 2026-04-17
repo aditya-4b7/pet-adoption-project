@@ -17,7 +17,7 @@ output "nexus_private_ip" {
 
 output "nexus_url" {
   description = "Nexus UI URL"
-  value       = "http://${aws_instance.nexus.public_ip}:8081"
+  value       = "http://${aws_instance.nexus.private_ip}:8081"
 }
 
 output "nexus_sg_id" {
