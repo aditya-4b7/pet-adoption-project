@@ -52,7 +52,7 @@ resource "aws_instance" "jenkins" {
               set -euxo pipefail
 
               dnf update -y
-              dnf install -y git unzip wget tar docker awscli python3 python3-pip java-17-amazon-corretto maven jq
+              dnf install -y git unzip wget tar docker awscli python3 python3-pip java-21-amazon-corretto maven jq
 
               systemctl enable --now docker
               usermod -aG docker ec2-user
