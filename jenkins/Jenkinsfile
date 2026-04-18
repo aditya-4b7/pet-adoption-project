@@ -80,12 +80,13 @@ pipeline {
             }
         }
 
-        stage('OWASP Dependency Check') {
+    stage('OWASP Dependency Check') {
         steps {
-            echo 'Skipping OWASP Dependency Check for now'
+            dir('app') {
+                sh 'mvn org.owasp:dependency-check-maven:check || true'
+            }
         }
     }
-
         stage('SonarQube Scan') {
             steps {
                 dir('app') {
