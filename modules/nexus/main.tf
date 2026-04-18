@@ -15,30 +15,32 @@ resource "aws_security_group" "nexus" {
     protocol = "tcp" 
     security_groups = [var.bastion_security_group_id]
     }
-  ingress { 
-    from_port = 8081 
-    to_port = 8081 
-    protocol = "tcp" 
-    cidr_blocks = [var.allowed_cidr] 
-    }
-    ingress ={
-      from_port = 8081
-      to_port = 8081
-      protocol = "tcp"
-      security_groups = [var.jenkins_security_group_id]
-    }
-  egress { 
-    from_port = 0 
-    to_port = 0 
-    protocol = "-1" 
-    cidr_blocks = ["0.0.0.0/0"] 
-    }
-  tags = { 
-    Name = "${var.project_name}-${var.env}-nexus-sg" 
-    Environment = var.env 
-    Project = var.project_name 
-    }
-}
+      
+    ingress { 
+      from_port = 8081 
+      to_port = 8081 
+      protocol = "tcp" 
+      cidr_blocks = [var.allowed_cidr] 
+      }
+
+      ingress {
+        from_port = 8081
+        to_port = 8081
+        protocol = "tcp"
+        security_groups = [var.jenkins_security_group_id]
+      }
+    egress { 
+      from_port = 0 
+      to_port = 0 
+        protocol = "-1" 
+        cidr_blocks = ["0.0.0.0/0"] 
+        }
+    tags = { 
+      Name = "${var.project_name}-${var.env}-nexus-sg" 
+      Environment = var.env 
+      Project = var.project_name 
+      }
+  }
 resource "aws_instance" "nexus" {
   ami = local.ami_id
   instance_type = var.instance_type
