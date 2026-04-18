@@ -53,7 +53,8 @@ resource "aws_instance" "jenkins" {
   vpc_security_group_ids      = [aws_security_group.jenkins.id]
   iam_instance_profile = var.iam_instance_profile_name
 
-  user_data = <<-EOF
+
+user_data = <<-EOF
               #!/bin/bash
               set -euxo pipefail
 
@@ -75,20 +76,23 @@ resource "aws_instance" "jenkins" {
 
               dnf clean all
               dnf install -y jenkins
+
+              usermod -aG docker jenkins
+
               systemctl enable --now jenkins
 
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.69.3
 
               cd /tmp
               curl -O https://releases.hashicorp.com/terraform/1.14.8/terraform_1.14.8_linux_amd64.zip
-              dnf install -y unzip
               unzip -o terraform_1.14.8_linux_amd64.zip
-              sudo mv terraform /usr/local/bin/terraform
-              sudo chmod +x /usr/local/bin/terraform
+              mv terraform /usr/local/bin/terraform
+              chmod +x /usr/local/bin/terraform
 
+              systemctl restart docker
               systemctl restart jenkins
               EOF
-
+	
   tags = {
     Name        = "${var.project_name}-${var.env}-jenkins"
     Environment = var.env
