@@ -11,7 +11,6 @@ pipeline {
         APP_NAME        = 'pet-adoption'
         APP_VERSION     = "${env.BUILD_NUMBER}"
         SONARQUBE_ENV   = 'sonarqube'
-        LOCAL_IMAGE_TAR = 'build/pet-adoption-image.tar'
         DOCKER_IMAGE    = 'pet-adoption'
     }
 
@@ -112,25 +111,32 @@ pipeline {
                 }
             }
         }
-
+    
         stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t ${DOCKER_IMAGE}:${APP_VERSION} app'
-                sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${DOCKER_IMAGE}:latest'
+                steps {
+                    sh 'docker build -t ${DOCKER_IMAGE}:${APP_VERSION} app'
+                    sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}'
+                    sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest'
+                }
             }
-        }
 
+      
         stage('Trivy Scan') {
             steps {
                 sh 'trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION} || true'
             }
         }
 
-        stage('Save Docker Image Tar') {
+           stage('Push Docker Image to Nexus') {
             steps {
-                sh 'docker save -o ${LOCAL_IMAGE_TAR} ${DOCKER_IMAGE}:${APP_VERSION}'
+                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    sh '''
+                        echo "$NEXUS_PASS" | docker login ${NEXUS_REGISTRY} -u "$NEXUS_USER" --password-stdin
+                        docker push ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}
+                        docker push ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest
+                    '''
+                }
             }
-        }
 
         stage('Generate Dynamic Inventory') {
             steps {
@@ -152,37 +158,40 @@ pipeline {
             }
         }
 
-        stage('Deploy to Private App Nodes') {
-            steps {
-                sshagent(credentials: ['ssh-private-key']) {
-                    script {
-                            
-                            sh 'echo "Deploying image: ${DOCKER_IMAGE}:${APP_VERSION}"'
-                            sh 'ls -l build/'
-                        // def extraVars = "local_image_tar=${LOCAL_IMAGE_TAR} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
-                        // if (params.ENABLE_NEW_RELIC) {
-                        //     withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
-                        //         sh """
-                        //         export ANSIBLE_HOST_KEY_CHECKING=False
-                        //         ansible-playbook -i ansible/inventory.ini \
-                        //           --ssh-common-args=\"-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'\" \
-                        //           ansible/deploy.yml \
-                        //           --extra-vars \"${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}\"
-                        //         """
-                        //     }
-                        // } else {
-                        //     sh """
-                        //     export ANSIBLE_HOST_KEY_CHECKING=False
-                        //     ansible-playbook -i ansible/inventory.ini \
-                        //       --ssh-common-args=\"-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'\" \
-                        //       ansible/deploy.yml \
-                        //       --extra-vars \"${extraVars}\"
-                        //     """
-                        // }
+        
+    stage('Deploy to Private App Nodes') {
+                steps {
+                    sshagent(credentials: ['ssh-private-key']) {
+                        withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                            script {
+                                def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
+
+                                if (params.ENABLE_NEW_RELIC) {
+                                    withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
+                                        sh """
+                                            export ANSIBLE_HOST_KEY_CHECKING=False
+                                            ansible-playbook -i ansible/inventory.ini \
+                                            --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                            ansible/deploy.yml \
+                                            --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
+                                        """
+                                    }
+                                } else {
+                                    sh """
+                                        export ANSIBLE_HOST_KEY_CHECKING=False
+                                        ansible-playbook -i ansible/inventory.ini \
+                                        --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                        ansible/deploy.yml \
+                                        --extra-vars "${extraVars}"
+                                    """
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
+
+       
 
         stage('Install New Relic Infra Agent (Optional)') {
             when {

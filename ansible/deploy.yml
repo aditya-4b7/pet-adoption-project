@@ -1,92 +1,50 @@
-# - hosts: web
-#   become: true
-#   serial: 1
-#   vars:
-#     container_name: pet-adoption
-#     app_port: 8080
-#     remote_tar_path: /opt/pet-adoption/pet-adoption-image.tar
-#   tasks:
-#     - name: Ensure deployment directory exists
-#       file:
-#         path: /opt/pet-adoption
-#         state: directory
-#         mode: "0755"
-
-#     - name: Copy image tar to target
-#       copy:
-#         src: "{{ local_image_tar }}"
-#         dest: "{{ remote_tar_path }}"
-#         mode: "0644"
-
-#     - name: Load Docker image
-#       command: docker load -i {{ remote_tar_path }}
-
-#     - name: Stop old container if present
-#       shell: docker rm -f {{ container_name }} || true
-
-#     - name: Run application container with New Relic support when configured
-#       shell: |
-#         set -e
-#         NR_ARGS=""
-#         if [ -n "{{ newrelic_license_key | default('') }}" ]; then
-#           NR_ARGS="-e NEW_RELIC_LICENSE_KEY={{ newrelic_license_key }} -e NEW_RELIC_APP_NAME={{ newrelic_app_name | default('pet-adoption') }}"
-#         fi
-#         docker run -d --restart always \
-#           --name {{ container_name }} \
-#           -p {{ app_port }}:8080 \
-#           ${NR_ARGS} \
-#           {{ image_name }}:{{ image_tag }}
-#       args:
-#         executable: /bin/bash
-
-#     - name: Wait for application to respond locally
-#       uri:
-#         url: http://127.0.0.1:8080/pet-adoption/
-#         status_code: 200
-#         validate_certs: false
-#       register: app_health
-#       retries: 20
-#       delay: 10
-#       until: app_health.status == 200
-
 - hosts: web
   become: true
   serial: 1
   vars:
     container_name: pet-adoption
     app_port: 8080
-    remote_tar_path: /opt/pet-adoption/pet-adoption-image.tar
+    nexus_registry: "{{ nexus_registry }}"
+    image_name: "{{ image_name }}"
+    image_tag: "{{ image_tag }}"
+    nexus_username: "{{ nexus_username }}"
+    nexus_password: "{{ nexus_password }}"
+
   tasks:
-    - name: Ensure deployment directory exists
-      file:
-        path: /opt/pet-adoption
-        state: directory
-        mode: "0755"
+    - name: Ensure Docker is installed
+      package:
+        name: docker
+        state: present
 
-    - name: Copy image tar to target
-      copy:
-        src: "{{ local_image_tar }}"
-        dest: "{{ remote_tar_path }}"
-        mode: "0644"
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: true
 
-    - name: Load Docker image
-      command: docker load -i {{ remote_tar_path }}
+    - name: Login to Nexus Docker registry
+      shell: |
+        echo "{{ nexus_password }}" | docker login {{ nexus_registry }} -u "{{ nexus_username }}" --password-stdin
+
+    - name: Pull latest image from Nexus
+      shell: docker pull {{ nexus_registry }}/{{ image_name }}:{{ image_tag }}
 
     - name: Stop old container if present
       shell: docker rm -f {{ container_name }} || true
 
-    - name: Run application container with New Relic support when configured
+    - name: Run application container
       shell: |
         set -e
         NR_ARGS=""
         if [ -n "{{ newrelic_license_key | default('') }}" ]; then
           NR_ARGS="-e NEW_RELIC_LICENSE_KEY={{ newrelic_license_key }} -e NEW_RELIC_APP_NAME={{ newrelic_app_name | default('pet-adoption') }}"
         fi
+
         docker run -d --restart always \
           --name {{ container_name }} \
           -p {{ app_port }}:8080 \
           ${NR_ARGS} \
-          {{ image_name }}:{{ image_tag }}
+          {{ nexus_registry }}/{{ image_name }}:{{ image_tag }}
       args:
         executable: /bin/bash
 

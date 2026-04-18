@@ -53,7 +53,7 @@ resource "aws_instance" "nexus" {
               dnf update -y
               dnf install -y docker
               systemctl enable --now docker
-              docker run -d --name nexus --restart always -p 8081:8081 sonatype/nexus3
+              sudo docker run -d --name nexus --restart always -p 8081:8081 -p 8082:8082 -v nexus-data:/nexus-data sonatype/nexus3
               EOF
 
   tags = { 
