@@ -21,6 +21,12 @@ resource "aws_security_group" "nexus" {
     protocol = "tcp" 
     cidr_blocks = [var.allowed_cidr] 
     }
+    ingress ={
+      from_port = 8081
+      to_port = 8081
+      protocol = "tcp"
+      security_groups = [var.jenkins_security_group_id]
+    }
   egress { 
     from_port = 0 
     to_port = 0 
