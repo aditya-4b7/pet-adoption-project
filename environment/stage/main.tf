@@ -43,6 +43,7 @@ module "jenkins" {
   project_name   = var.project_name
   env            = var.env
   vpc_id         = module.vpc.vpc_id
+  vpc_cidr =  var.vpc_cidr
   public_subnet  = module.vpc.public_subnets[0]
   key_name       = var.key_name
   allowed_cidr   = var.allowed_admin_cidr
@@ -62,6 +63,7 @@ module "sonarqube" {
   instance_type  = var.tool_instance_type
   ami_id         = var.ami_id
   bastion_security_group_id = module.bastion.bastion_sg_id 
+  jenkins_security_group_id = module.jenkins.jenkins_sg_id
 }
 
 module "nexus" {

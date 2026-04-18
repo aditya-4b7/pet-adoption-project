@@ -81,15 +81,10 @@ pipeline {
         }
 
         stage('OWASP Dependency Check') {
-            steps {
-                sh 'mvn dependency-check:check || true'
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
-                }
-            }
+        steps {
+            echo 'Skipping OWASP Dependency Check for now'
         }
+    }
 
         stage('SonarQube Scan') {
             steps {

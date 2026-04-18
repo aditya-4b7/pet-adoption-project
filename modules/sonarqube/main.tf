@@ -23,6 +23,14 @@ resource "aws_security_group" "sonarqube" {
     cidr_blocks = [var.allowed_cidr]
   }
 
+  ingress {
+    from_port   = 9000
+    to_port     = 9000
+    protocol    = "tcp"
+    security_groups = [var.jenkins_security_group_id]
+  }
+  
+
   egress {
     from_port   = 0
     to_port     = 0
