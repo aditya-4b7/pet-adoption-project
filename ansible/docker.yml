@@ -1,25 +1,84 @@
+# - hosts: web
+#   become: true
+#   serial: 1
+#   tasks:
+#     - name: Ensure Docker is installed
+#       package:
+#         name: docker
+#         state: present
+
+#     - name: Ensure Docker service is enabled and running
+#       service:
+#         name: docker
+#         state: started
+#         enabled: true
+
+#     - name: Ensure Python 3 is present
+#       package:
+#         name: python3
+#         state: present
+
+#     - name: Ensure deployment directory exists
+#       file:
+#         path: /opt/pet-adoption
+#         state: directory
+#         mode: "0755"
 - hosts: web
   become: true
   serial: 1
+  vars:
+    container_name: pet-adoption
+    app_port: 8080
+    nexus_registry: "{{ nexus_registry }}"
+    image_name: "{{ image_name }}"
+    image_tag: "{{ image_tag }}"
+    nexus_username: "{{ nexus_username }}"
+    nexus_password: "{{ nexus_password }}"
+
   tasks:
     - name: Ensure Docker is installed
       package:
         name: docker
         state: present
 
-    - name: Ensure Docker service is enabled and running
+    - name: Ensure Docker is running
       service:
         name: docker
         state: started
         enabled: true
 
-    - name: Ensure Python 3 is present
-      package:
-        name: python3
-        state: present
+    - name: Login to Nexus Docker registry
+      shell: |
+        echo "{{ nexus_password }}" | docker login {{ nexus_registry }} -u "{{ nexus_username }}" --password-stdin
 
-    - name: Ensure deployment directory exists
-      file:
-        path: /opt/pet-adoption
-        state: directory
-        mode: "0755"
+    - name: Pull latest image from Nexus
+      shell: docker pull {{ nexus_registry }}/{{ image_name }}:{{ image_tag }}
+
+    - name: Stop old container if present
+      shell: docker rm -f {{ container_name }} || true
+
+    - name: Run application container
+      shell: |
+        set -e
+        NR_ARGS=""
+        if [ -n "{{ newrelic_license_key | default('') }}" ]; then
+          NR_ARGS="-e NEW_RELIC_LICENSE_KEY={{ newrelic_license_key }} -e NEW_RELIC_APP_NAME={{ newrelic_app_name | default('pet-adoption') }}"
+        fi
+
+        docker run -d --restart always \
+          --name {{ container_name }} \
+          -p {{ app_port }}:8080 \
+          ${NR_ARGS} \
+          {{ nexus_registry }}/{{ image_name }}:{{ image_tag }}
+      args:
+        executable: /bin/bash
+
+    - name: Wait for application to respond locally
+      uri:
+        url: http://127.0.0.1:8080/pet-adoption/
+        status_code: 200
+        validate_certs: false
+      register: app_health
+      retries: 20
+      delay: 10
+      until: app_health.status == 200

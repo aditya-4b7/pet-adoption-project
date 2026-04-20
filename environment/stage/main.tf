@@ -76,7 +76,7 @@ module "nexus" {
   allowed_cidr   = var.allowed_admin_cidr
   instance_type  = var.tool_instance_type
   ami_id         = var.ami_id
-  bastion_security_group_id = module.bastion.bastion_sg_id  
+  bastion_security_group_id = module.bastion.bastion_sg_id
   jenkins_security_group_id = module.jenkins.jenkins_sg_id
 }
 

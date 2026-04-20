@@ -1,3 +1,237 @@
+// pipeline {
+//     agent any
+
+//     parameters {
+//         choice(name: 'TERRAFORM_ENV', choices: ['stage', 'prod'], description: 'Environment folder under environment/')
+//         string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region used by Terraform and discovery script')
+//         booleanParam(name: 'ENABLE_NEW_RELIC', defaultValue: false, description: 'Install New Relic infrastructure agent on app nodes after deploy')
+//     }
+
+//     environment {
+//         APP_NAME        = 'pet-adoption'
+//         APP_VERSION     = "${env.BUILD_NUMBER}"
+//         SONARQUBE_ENV   = 'sonarqube'
+//         DOCKER_IMAGE    = 'pet-adoption'
+//     }
+
+//     tools {
+//         jdk 'jdk21'
+//         maven 'maven3'
+//     }
+
+//     options {
+//         timestamps()
+//         disableConcurrentBuilds()
+//     }
+
+//     stages {
+//         stage('Checkout') {
+//             steps {
+//                 checkout scm
+//             }
+//         }
+
+//         stage('Prepare Workspace') {
+//             steps {
+//                 sh 'mkdir -p build reports'
+//             }
+//         }
+
+//         // stage('Read Terraform Outputs') {
+//         //     steps {
+//         //         dir("environment/${params.TERRAFORM_ENV}") {
+//         //             script {
+//         //                 env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
+//         //                 env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
+//         //                 env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
+//         //                 env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
+//         //             }
+//         //         }
+//         //     }
+//         // }
+
+//        stage('Read Terraform Outputs') {
+//         steps {
+//             script {
+//                 sh """
+//                     cd ${WORKSPACE}
+//                     chmod +x scripts/init-env.sh
+//                     ./scripts/init-env.sh ${params.TERRAFORM_ENV}
+//                 """
+
+//                 dir("environment/${params.TERRAFORM_ENV}") {
+//                     sh 'terraform init -reconfigure -backend-config=backend.auto.hcl'
+
+//                     env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
+//                     env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
+//                     env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
+//                     env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
+//                 }
+//             }
+//         }
+//     }
+
+//         stage('Build WAR') {
+//             steps {
+//                 dir('app') {
+//                     sh 'mvn clean package -DskipTests'
+//                 }
+//             }
+//         }
+
+//     stage('OWASP Dependency Check') {
+//         steps {
+//             dir('app') {
+//                 sh 'mvn org.owasp:dependency-check-maven:check || true'
+//             }
+//         }
+//     }
+//         stage('SonarQube Scan') {
+//             steps {
+//                 dir('app') {
+//                     withSonarQubeEnv("${SONARQUBE_ENV}") {
+//                         sh 'mvn sonar:sonar -Dsonar.projectKey=pet-adoption -Dsonar.projectName=pet-adoption -Dsonar.login=$SONAR_AUTH_TOKEN'
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Quality Gate') {
+//             steps {
+//                 timeout(time: 10, unit: 'MINUTES') {
+//                     waitForQualityGate abortPipeline: true
+//                 }
+//             }
+//         }
+
+//         stage('Upload WAR to Nexus') {
+//             steps {
+//                 withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+//                     sh 'curl -u "$NEXUS_USER:$NEXUS_PASS" --upload-file app/target/pet-adoption.war "${NEXUS_URL}/repository/raw-hosted/pet-adoption/${APP_VERSION}/pet-adoption.war"'
+//                 }
+//             }
+//         }
+    
+//         stage('Build Docker Image') {
+//                 steps {
+//                     sh 'docker build -t ${DOCKER_IMAGE}:${APP_VERSION} app'
+//                     sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}'
+//                     sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest'
+//                 }
+//             }
+
+      
+//         stage('Trivy Scan') {
+//             steps {
+//                 sh 'trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION} || true'
+//             }
+//         }
+
+//            stage('Push Docker Image to Nexus') {
+//             steps {
+//                 withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+//                     sh '''
+//                         echo "$NEXUS_PASS" | docker login ${NEXUS_REGISTRY} -u "$NEXUS_USER" --password-stdin
+//                         docker push ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}
+//                         docker push ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest
+//                     '''
+//                 }
+//             }
+
+//         stage('Generate Dynamic Inventory') {
+//             steps {
+//                 sh 'bash scripts/dynamic_inventory.sh ${AWS_REGION} ${ASG_NAME}'
+//                 sh 'cat ansible/inventory.ini'
+//             }
+//         }
+
+//         stage('Bootstrap Docker on App Nodes') {
+//             steps {
+//                 sshagent(credentials: ['ssh-private-key']) {
+//                     sh '''
+//                     export ANSIBLE_HOST_KEY_CHECKING=False
+//                     ansible-playbook -i ansible/inventory.ini \
+//                       --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+//                       ansible/docker.yml
+//                     '''
+//                 }
+//             }
+//         }
+
+        
+//     stage('Deploy to Private App Nodes') {
+//                 steps {
+//                     sshagent(credentials: ['ssh-private-key']) {
+//                         withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+//                             script {
+//                                 def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
+
+//                                 if (params.ENABLE_NEW_RELIC) {
+//                                     withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
+//                                         sh """
+//                                             export ANSIBLE_HOST_KEY_CHECKING=False
+//                                             ansible-playbook -i ansible/inventory.ini \
+//                                             --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+//                                             ansible/deploy.yml \
+//                                             --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
+//                                         """
+//                                     }
+//                                 } else {
+//                                     sh """
+//                                         export ANSIBLE_HOST_KEY_CHECKING=False
+//                                         ansible-playbook -i ansible/inventory.ini \
+//                                         --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+//                                         ansible/deploy.yml \
+//                                         --extra-vars "${extraVars}"
+//                                     """
+//                                 }
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+
+       
+
+//         stage('Install New Relic Infra Agent (Optional)') {
+//             when {
+//                 expression { return params.ENABLE_NEW_RELIC }
+//             }
+//             steps {
+//                 sshagent(credentials: ['ssh-private-key']) {
+//                     withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
+//                         sh '''
+//                         export ANSIBLE_HOST_KEY_CHECKING=False
+//                         ansible-playbook -i ansible/inventory.ini \
+//                           --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+//                           ansible/newrelic.yml \
+//                           --extra-vars "newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Smoke Test') {
+//             steps {
+//                 sh 'curl -k --fail --silent --show-error ${APPLICATION_URL}/pet-adoption/ > /dev/null'
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo 'Pipeline completed successfully.'
+//         }
+//         failure {
+//             echo 'Pipeline failed.'
+//         }
+//         always {
+//             archiveArtifacts artifacts: 'app/target/*.war, build/*.tar, ansible/inventory.ini', allowEmptyArchive: true
+//         }
+//     }
+// }
+
 pipeline {
     agent any
 
@@ -8,10 +242,10 @@ pipeline {
     }
 
     environment {
-        APP_NAME        = 'pet-adoption'
-        APP_VERSION     = "${env.BUILD_NUMBER}"
-        SONARQUBE_ENV   = 'sonarqube'
-        DOCKER_IMAGE    = 'pet-adoption'
+        APP_NAME       = 'pet-adoption'
+        APP_VERSION    = "${env.BUILD_NUMBER}"
+        SONARQUBE_ENV  = 'sonarqube'
+        DOCKER_IMAGE   = 'pet-adoption'
     }
 
     tools {
@@ -33,43 +267,31 @@ pipeline {
 
         stage('Prepare Workspace') {
             steps {
-                sh 'mkdir -p build reports'
+                sh 'mkdir -p reports'
             }
         }
 
-        // stage('Read Terraform Outputs') {
-        //     steps {
-        //         dir("environment/${params.TERRAFORM_ENV}") {
-        //             script {
-        //                 env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
-        //                 env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
-        //                 env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
-        //                 env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
-        //             }
-        //         }
-        //     }
-        // }
+        stage('Read Terraform Outputs') {
+            steps {
+                script {
+                    sh """
+                        cd ${WORKSPACE}
+                        chmod +x scripts/init-env.sh
+                        ./scripts/init-env.sh ${params.TERRAFORM_ENV}
+                    """
 
-       stage('Read Terraform Outputs') {
-        steps {
-            script {
-                sh """
-                    cd ${WORKSPACE}
-                    chmod +x scripts/init-env.sh
-                    ./scripts/init-env.sh ${params.TERRAFORM_ENV}
-                """
+                    dir("environment/${params.TERRAFORM_ENV}") {
+                        sh '/usr/local/bin/terraform init -reconfigure -backend-config=backend.auto.hcl'
 
-                dir("environment/${params.TERRAFORM_ENV}") {
-                    sh 'terraform init -reconfigure -backend-config=backend.auto.hcl'
-
-                    env.ASG_NAME = sh(script: 'terraform output -raw asg_name', returnStdout: true).trim()
-                    env.BASTION_PUBLIC_IP = sh(script: 'terraform output -raw bastion_public_ip', returnStdout: true).trim()
-                    env.NEXUS_URL = sh(script: 'terraform output -raw nexus_url', returnStdout: true).trim()
-                    env.APPLICATION_URL = sh(script: 'terraform output -raw application_url', returnStdout: true).trim()
+                        env.ASG_NAME = sh(script: '/usr/local/bin/terraform output -raw asg_name', returnStdout: true).trim()
+                        env.BASTION_PUBLIC_IP = sh(script: '/usr/local/bin/terraform output -raw bastion_public_ip', returnStdout: true).trim()
+                        env.NEXUS_URL = sh(script: '/usr/local/bin/terraform output -raw nexus_url', returnStdout: true).trim()
+                        env.NEXUS_REGISTRY = sh(script: '/usr/local/bin/terraform output -raw nexus_docker_registry', returnStdout: true).trim()
+                        env.APPLICATION_URL = sh(script: '/usr/local/bin/terraform output -raw application_url', returnStdout: true).trim()
+                    }
                 }
             }
         }
-    }
 
         stage('Build WAR') {
             steps {
@@ -79,18 +301,24 @@ pipeline {
             }
         }
 
-    stage('OWASP Dependency Check') {
-        steps {
-            dir('app') {
-                sh 'mvn org.owasp:dependency-check-maven:check || true'
+        stage('OWASP Dependency Check') {
+            steps {
+                dir('app') {
+                    sh 'mvn org.owasp:dependency-check-maven:check || true'
+                }
             }
         }
-    }
+
         stage('SonarQube Scan') {
             steps {
                 dir('app') {
                     withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        sh 'mvn sonar:sonar -Dsonar.projectKey=pet-adoption -Dsonar.projectName=pet-adoption -Dsonar.login=$SONAR_AUTH_TOKEN'
+                        sh '''
+                            mvn sonar:sonar \
+                              -Dsonar.projectKey=pet-adoption \
+                              -Dsonar.projectName=pet-adoption \
+                              -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
                     }
                 }
             }
@@ -107,27 +335,30 @@ pipeline {
         stage('Upload WAR to Nexus') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                    sh 'curl -u "$NEXUS_USER:$NEXUS_PASS" --upload-file app/target/pet-adoption.war "${NEXUS_URL}/repository/raw-hosted/pet-adoption/${APP_VERSION}/pet-adoption.war"'
+                    sh '''
+                        curl -v -u "$NEXUS_USER:$NEXUS_PASS" \
+                          --upload-file app/target/pet-adoption.war \
+                          "${NEXUS_URL}/repository/raw-hosted/pet-adoption/${APP_VERSION}/pet-adoption.war"
+                    '''
                 }
             }
         }
-    
-        stage('Build Docker Image') {
-                steps {
-                    sh 'docker build -t ${DOCKER_IMAGE}:${APP_VERSION} app'
-                    sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}'
-                    sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest'
-                }
-            }
 
-      
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ${DOCKER_IMAGE}:${APP_VERSION} app'
+                sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:${APP_VERSION}'
+                sh 'docker tag ${DOCKER_IMAGE}:${APP_VERSION} ${NEXUS_REGISTRY}/${DOCKER_IMAGE}:latest'
+            }
+        }
+
         stage('Trivy Scan') {
             steps {
                 sh 'trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION} || true'
             }
         }
 
-           stage('Push Docker Image to Nexus') {
+        stage('Push Docker Image to Nexus') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     sh '''
@@ -137,6 +368,7 @@ pipeline {
                     '''
                 }
             }
+        }
 
         stage('Generate Dynamic Inventory') {
             steps {
@@ -149,49 +381,46 @@ pipeline {
             steps {
                 sshagent(credentials: ['ssh-private-key']) {
                     sh '''
-                    export ANSIBLE_HOST_KEY_CHECKING=False
-                    ansible-playbook -i ansible/inventory.ini \
-                      --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                      ansible/docker.yml
+                        export ANSIBLE_HOST_KEY_CHECKING=False
+                        ansible-playbook -i ansible/inventory.ini \
+                          --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                          ansible/docker.yml
                     '''
                 }
             }
         }
 
-        
-    stage('Deploy to Private App Nodes') {
-                steps {
-                    sshagent(credentials: ['ssh-private-key']) {
-                        withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                            script {
-                                def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
+        stage('Deploy to Private App Nodes') {
+            steps {
+                sshagent(credentials: ['ssh-private-key']) {
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                        script {
+                            def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
 
-                                if (params.ENABLE_NEW_RELIC) {
-                                    withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
-                                        sh """
-                                            export ANSIBLE_HOST_KEY_CHECKING=False
-                                            ansible-playbook -i ansible/inventory.ini \
-                                            --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                                            ansible/deploy.yml \
-                                            --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
-                                        """
-                                    }
-                                } else {
+                            if (params.ENABLE_NEW_RELIC) {
+                                withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
                                     sh """
                                         export ANSIBLE_HOST_KEY_CHECKING=False
                                         ansible-playbook -i ansible/inventory.ini \
-                                        --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                                        ansible/deploy.yml \
-                                        --extra-vars "${extraVars}"
+                                          --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                          ansible/deploy.yml \
+                                          --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
                                     """
                                 }
+                            } else {
+                                sh """
+                                    export ANSIBLE_HOST_KEY_CHECKING=False
+                                    ansible-playbook -i ansible/inventory.ini \
+                                      --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                      ansible/deploy.yml \
+                                      --extra-vars "${extraVars}"
+                                """
                             }
                         }
                     }
                 }
             }
-
-       
+        }
 
         stage('Install New Relic Infra Agent (Optional)') {
             when {
@@ -201,11 +430,11 @@ pipeline {
                 sshagent(credentials: ['ssh-private-key']) {
                     withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
                         sh '''
-                        export ANSIBLE_HOST_KEY_CHECKING=False
-                        ansible-playbook -i ansible/inventory.ini \
-                          --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                          ansible/newrelic.yml \
-                          --extra-vars "newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
+                            export ANSIBLE_HOST_KEY_CHECKING=False
+                            ansible-playbook -i ansible/inventory.ini \
+                              --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                              ansible/newrelic.yml \
+                              --extra-vars "newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
                         '''
                     }
                 }
@@ -227,7 +456,7 @@ pipeline {
             echo 'Pipeline failed.'
         }
         always {
-            archiveArtifacts artifacts: 'app/target/*.war, build/*.tar, ansible/inventory.ini', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
         }
     }
 }
