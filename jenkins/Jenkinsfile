@@ -376,51 +376,51 @@ pipeline {
                 sh 'cat ansible/inventory.ini'
             }
         }
-
-        stage('Bootstrap Docker on App Nodes') {
-            steps {
-                sshagent(credentials: ['ssh-private-key']) {
-                    sh '''
-                        export ANSIBLE_HOST_KEY_CHECKING=False
-                        ansible-playbook -i ansible/inventory.ini \
-                          --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                          ansible/docker.yml
-                    '''
-                }
+        
+    stage('Bootstrap Docker on App Nodes') {
+        steps {
+            sshagent(credentials: ['ssh-private-key']) {
+                sh '''
+                    export ANSIBLE_HOST_KEY_CHECKING=False
+                    ansible-playbook -i ansible/inventory.ini \
+                    --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                    ansible/docker.yml
+                '''
             }
         }
+    }
 
-        stage('Deploy to Private App Nodes') {
-            steps {
-                sshagent(credentials: ['ssh-private-key']) {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                        script {
-                            def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
+    stage('Deploy to Private App Nodes') {
+        steps {
+            sshagent(credentials: ['ssh-private-key']) {
+                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    script {
+                        def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
 
-                            if (params.ENABLE_NEW_RELIC) {
-                                withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
-                                    sh """
-                                        export ANSIBLE_HOST_KEY_CHECKING=False
-                                        ansible-playbook -i ansible/inventory.ini \
-                                          --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                                          ansible/deploy.yml \
-                                          --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
-                                    """
-                                }
-                            } else {
+                        if (params.ENABLE_NEW_RELIC) {
+                            withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
                                 sh """
                                     export ANSIBLE_HOST_KEY_CHECKING=False
                                     ansible-playbook -i ansible/inventory.ini \
-                                      --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
-                                      ansible/deploy.yml \
-                                      --extra-vars "${extraVars}"
+                                    --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                    ansible/deploy.yml \
+                                    --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
                                 """
                             }
+                        } else {
+                            sh """
+                                export ANSIBLE_HOST_KEY_CHECKING=False
+                                ansible-playbook -i ansible/inventory.ini \
+                                --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                ansible/deploy.yml \
+                                --extra-vars "${extraVars}"
+                            """
                         }
                     }
                 }
             }
         }
+    }
 
         stage('Install New Relic Infra Agent (Optional)') {
             when {

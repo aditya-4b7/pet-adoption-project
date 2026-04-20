@@ -29,6 +29,12 @@ resource "aws_security_group" "nexus" {
         protocol = "tcp"
         security_groups = [var.jenkins_security_group_id]
       }
+          ingress {
+        from_port = 8082
+        to_port = 8082
+        protocol = "tcp"
+        security_groups = [var.jenkins_security_group_id]
+      }
     egress { 
       from_port = 0 
       to_port = 0 

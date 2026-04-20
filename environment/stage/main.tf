@@ -140,6 +140,10 @@ output "nexus_url" {
   value = module.nexus.nexus_url
 }
 
+output "nexus_docker_registry" {
+  value = module.nexus.nexus_docker_registry
+}
+
 output "application_url" {
   value = "https://${var.domain_name}"
 }
