@@ -42,6 +42,7 @@ resource "aws_security_group" "nexus" {
         protocol = "tcp"
         security_groups = [var.app_security_group_id]
       }
+      
     egress { 
       from_port = 0 
       to_port = 0 
