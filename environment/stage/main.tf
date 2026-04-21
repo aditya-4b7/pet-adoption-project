@@ -79,6 +79,7 @@ module "nexus" {
   ami_id         = var.ami_id
   bastion_security_group_id = module.bastion.bastion_sg_id
   jenkins_security_group_id = module.jenkins.jenkins_sg_id
+  app_security_group_id = module.asg.app_sg_id 
 }
 
 module "acm" {
