@@ -285,6 +285,7 @@ pipeline {
 
                         env.ASG_NAME = sh(script: '/usr/local/bin/terraform output -raw asg_name', returnStdout: true).trim()
                         env.BASTION_PUBLIC_IP = sh(script: '/usr/local/bin/terraform output -raw bastion_public_ip', returnStdout: true).trim()
+                        env.BASTION_PRIVATE_IP = sh(script: '/usr/local/bin/terraform output -raw bastion_private_ip', returnStdout: true).trim()
                         env.NEXUS_URL = sh(script: '/usr/local/bin/terraform output -raw nexus_url', returnStdout: true).trim()
                         env.NEXUS_REGISTRY = sh(script: '/usr/local/bin/terraform output -raw nexus_docker_registry', returnStdout: true).trim()
                         env.APPLICATION_URL = sh(script: '/usr/local/bin/terraform output -raw application_url', returnStdout: true).trim()
