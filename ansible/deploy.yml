@@ -4,11 +4,6 @@
   vars:
     container_name: pet-adoption
     app_port: 8080
-    nexus_registry: "{{ nexus_registry }}"
-    image_name: "{{ image_name }}"
-    image_tag: "{{ image_tag }}"
-    nexus_username: "{{ nexus_username }}"
-    nexus_password: "{{ nexus_password }}"
 
   tasks:
     - name: Ensure Docker is installed
