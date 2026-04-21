@@ -15,7 +15,7 @@ This repository deploys a containerized Java web application through a Jenkins C
 - New Relic: optional infrastructure monitoring on app nodes
 - Tomcat: application server in the Docker image
 - Maven: Java build and packaging
-- Java 17: build and runtime base
+- Java 21: build and runtime base
 - Trivy: container vulnerability scanning
 - OWASP Dependency Check: dependency vulnerability scanning
 
@@ -83,7 +83,7 @@ terraform apply -auto-approve
 
 ## Jenkins Setup Summary
 Configure these Jenkins tools:
-- JDK named `jdk17`
+- JDK named `jdk21`
 - Maven named `maven3`
 
 Configure these Jenkins credentials:
@@ -106,6 +106,3 @@ Configure these Jenkins credentials:
 12. Deploy the new image to app nodes through the bastion host
 13. Optionally install New Relic infrastructure agent
 14. Run an HTTPS smoke test against the application domain
-
-## Proof Included
-See `PROOF_OF_UPDATE.md` for the exact files updated and the checks performed.

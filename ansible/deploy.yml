@@ -4,6 +4,7 @@
   vars:
     container_name: pet-adoption
     app_port: 8080
+    newrelic_license_key: ""
 
   tasks:
     - name: Ensure Docker is installed
