@@ -36,6 +36,7 @@ module "bastion" {
   instance_type     = var.bastion_instance_type
   allowed_ssh_cidr  = var.allowed_admin_cidr
   ami_id            = var.ami_id
+  jenkins_security_group_id = module.jenkins.jenkins_sg_id
 }
 
 module "jenkins" {

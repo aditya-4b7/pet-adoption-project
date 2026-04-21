@@ -8,3 +8,4 @@ variable "instance_type" {
     type = string 
 }
 variable "ami_id" { type = string}
+variable "jenkins_security_group_id" { type = string }
