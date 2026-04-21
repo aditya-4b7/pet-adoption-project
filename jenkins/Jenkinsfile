@@ -383,7 +383,7 @@ pipeline {
                 sh '''
                     export ANSIBLE_HOST_KEY_CHECKING=False
                     ansible-playbook -i ansible/inventory.ini \
-                    --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                    --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentityAgent=$SSH_AUTH_SOCK -o ProxyCommand='ssh -o IdentityAgent=$SSH_AUTH_SOCK -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@10.10.1.73'" \
                     ansible/docker.yml
                 '''
             }
@@ -402,7 +402,7 @@ pipeline {
                                 sh """
                                     export ANSIBLE_HOST_KEY_CHECKING=False
                                     ansible-playbook -i ansible/inventory.ini \
-                                    --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                    --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -J ec2-user@${BASTION_PUBLIC_IP}" \
                                     ansible/deploy.yml \
                                     --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
                                 """
@@ -411,7 +411,7 @@ pipeline {
                             sh """
                                 export ANSIBLE_HOST_KEY_CHECKING=False
                                 ansible-playbook -i ansible/inventory.ini \
-                                --ssh-common-args="-o ProxyCommand='ssh -o StrictHostKeyChecking=no -W %h:%p ec2-user@${BASTION_PUBLIC_IP}'" \
+                                --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -J ec2-user@${BASTION_PUBLIC_IP}" \
                                 ansible/deploy.yml \
                                 --extra-vars "${extraVars}"
                             """
@@ -421,6 +421,7 @@ pipeline {
             }
         }
     }
+    
 
         stage('Install New Relic Infra Agent (Optional)') {
             when {
