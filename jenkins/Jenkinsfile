@@ -376,53 +376,51 @@ pipeline {
                 sh 'cat ansible/inventory.ini'
             }
         }
-        
-   stage('Bootstrap Docker on App Nodes') {
-    steps {
-        sh '''
-            export ANSIBLE_HOST_KEY_CHECKING=False
-            ansible-playbook -i ansible/inventory.ini \
-              --private-key /var/lib/jenkins/.ssh/my_key.pem \
-              -u ec2-user \
-              --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@10.10.1.73'" \
-              ansible/docker.yml
-        '''
+            
+    stage('Bootstrap Docker on App Nodes') {
+        steps {
+            sh '''
+                export ANSIBLE_HOST_KEY_CHECKING=False
+                ansible-playbook -i ansible/inventory.ini \
+                --private-key /var/lib/jenkins/.ssh/my_key.pem \
+                -u ec2-user \
+                --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@10.10.1.73'" \
+                ansible/docker.yml
+            '''
+        }
     }
-}
 
-    stage('Deploy to Private App Nodes') {
-    steps {
-        withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-            script {
-                def extraVars = "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
-
-                if (params.ENABLE_NEW_RELIC) {
-                    withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
+            stage('Deploy to Private App Nodes') {
+        steps {
+            withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                script {
+                    if (params.ENABLE_NEW_RELIC) {
+                        withCredentials([string(credentialsId: 'newrelic-license-key', variable: 'NEW_RELIC_LICENSE_KEY')]) {
+                            sh """
+                                export ANSIBLE_HOST_KEY_CHECKING=False
+                                ansible-playbook -i ansible/inventory.ini \
+                                --private-key /var/lib/jenkins/.ssh/my_key.pem \
+                                -u ec2-user \
+                                --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_PRIVATE_IP}'" \
+                                ansible/deploy.yml \
+                                --extra-vars "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_license_key=${NEW_RELIC_LICENSE_KEY} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
+                            """
+                        }
+                    } else {
                         sh """
                             export ANSIBLE_HOST_KEY_CHECKING=False
                             ansible-playbook -i ansible/inventory.ini \
-                              --private-key /var/lib/jenkins/.ssh/my_key.pem \
-                              -u ec2-user \
-                              --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@10.10.1.73'" \
-                              ansible/deploy.yml \
-                              --extra-vars "${extraVars} newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
+                            --private-key /var/lib/jenkins/.ssh/my_key.pem \
+                            -u ec2-user \
+                            --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_PRIVATE_IP}'" \
+                            ansible/deploy.yml \
+                            --extra-vars "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
                         """
                     }
-                } else {
-                    sh """
-                        export ANSIBLE_HOST_KEY_CHECKING=False
-                        ansible-playbook -i ansible/inventory.ini \
-                          --private-key /var/lib/jenkins/.ssh/my_key.pem \
-                          -u ec2-user \
-                          --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@10.10.1.73'" \
-                          ansible/deploy.yml \
-                          --extra-vars "${extraVars}"
-                    """
                 }
             }
         }
     }
-}
 
         stage('Install New Relic Infra Agent (Optional)') {
             when {
