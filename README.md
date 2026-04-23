@@ -15,7 +15,7 @@ This repository deploys a containerized Java web application through a Jenkins C
 - New Relic: optional infrastructure monitoring on app nodes
 - Tomcat: application server in the Docker image
 - Maven: Java build and packaging
-- Java 17: build and runtime base
+- Java 21: build and runtime base
 - Trivy: container vulnerability scanning
 - OWASP Dependency Check: dependency vulnerability scanning
 
