@@ -353,11 +353,14 @@ pipeline {
             }
         }
 
-        stage('Trivy Scan') {
-            steps {
-                sh 'trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION} || true'
-            }
+    stage('Trivy Scan') {
+        steps {
+            sh '''
+                mkdir -p reports
+                trivy image --severity HIGH,CRITICAL --format table ${DOCKER_IMAGE}:${APP_VERSION} | tee reports/trivy-image-report.txt
+            '''
         }
+    }
 
         stage('Push Docker Image to Nexus') {
             steps {
@@ -390,6 +393,7 @@ pipeline {
             '''
         }
     }
+        
     stage('Deploy to Private App Nodes') {
         steps {
             withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
@@ -414,6 +418,7 @@ pipeline {
             }
         }
     }
+
         stage('Install New Relic Infra Agent (Optional)') {
             when {
                 expression { return params.ENABLE_NEW_RELIC }
@@ -440,7 +445,7 @@ pipeline {
         }
     }
 
-    post {
+        post {
         success {
             echo 'Pipeline completed successfully.'
         }
@@ -448,7 +453,7 @@ pipeline {
             echo 'Pipeline failed.'
         }
         always {
-            archiveArtifacts artifacts: 'app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'app/target/*.war, app/target/dependency-check-report/**, ansible/inventory.ini, reports/**', allowEmptyArchive: true
         }
     }
 }
