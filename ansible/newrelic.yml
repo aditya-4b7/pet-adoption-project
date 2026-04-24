@@ -1,6 +1,7 @@
 - hosts: web
   become: true
   serial: 1
+
   tasks:
     - name: Skip when New Relic license key is not provided
       meta: end_host
@@ -28,6 +29,9 @@
         content: |
           license_key: {{ newrelic_license_key }}
           display_name: {{ inventory_hostname }}
+        owner: root
+        group: root
+        mode: "0600"
       notify: restart newrelic
 
   handlers:

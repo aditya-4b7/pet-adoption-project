@@ -8,8 +8,19 @@
         name: docker
         state: present
 
+    - name: Configure Docker insecure registry for Nexus
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "insecure-registries": ["10.10.2.248:8082"]
+          }
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Ensure Docker is running
       service:
         name: docker
-        state: started
-        enabled: true 
+        state: restarted
+        enabled: true

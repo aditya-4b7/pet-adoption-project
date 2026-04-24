@@ -1,15 +1,19 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
+
   <groupId>com.petadoption</groupId>
   <artifactId>pet-adoption</artifactId>
   <version>1.0.0</version>
   <packaging>war</packaging>
   <name>pet-adoption</name>
+
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
+
   <dependencies>
     <dependency>
       <groupId>javax.servlet</groupId>
@@ -18,36 +22,26 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
+
   <build>
-  <finalName>pet-adoption</finalName>
-  <plugins>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-war-plugin</artifactId>
-      <version>3.4.0</version>
-      <configuration>
-        <failOnMissingWebXml>false</failOnMissingWebXml>
-      </configuration>
-    </plugin>
+    <finalName>pet-adoption</finalName>
 
-    <plugin>
-      <groupId>org.owasp</groupId>
-      <artifactId>dependency-check-maven</artifactId>
-      <version>9.2.0</version>
-      <configuration>
-        <formats>
-          <format>HTML</format>
-          <format>XML</format>
-        </formats>
-        <outputDirectory>${project.build.directory}/dependency-check-report</outputDirectory>
-      </configuration>
-    </plugin>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-war-plugin</artifactId>
+        <version>3.4.0</version>
+        <configuration>
+          <failOnMissingWebXml>false</failOnMissingWebXml>
+        </configuration>
+      </plugin>
 
-    <plugin>
-      <groupId>org.sonarsource.scanner.maven</groupId>
-      <artifactId>sonar-maven-plugin</artifactId>
-      <version>3.10.0.2594</version>
-    </plugin>
-  </plugins>
-</build>
+      <plugin>
+        <groupId>org.sonarsource.scanner.maven</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>3.10.0.2594</version>
+      </plugin>
+    </plugins>
+  </build>
+
 </project>
