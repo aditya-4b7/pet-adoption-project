@@ -13,6 +13,16 @@ provider "aws" {
   region = var.region
 }
 
+data "terraform_remote_state" "stage" {
+  backend = "s3"
+
+  config = {
+    bucket = "pet-adoption-stage-tf-state-083546510470"
+    key    = "stage/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
 module "vpc" {
   source                = "../../modules/vpc"
   project_name          = var.project_name
@@ -27,59 +37,18 @@ module "vpc" {
 }
 
 module "bastion" {
-  source            = "../../modules/bastion"
-  project_name      = var.project_name
-  env               = var.env
-  vpc_id            = module.vpc.vpc_id
-  public_subnet     = module.vpc.public_subnets[0]
-  key_name          = var.key_name
-  instance_type     = var.bastion_instance_type
-  allowed_ssh_cidr  = var.allowed_admin_cidr
-  ami_id            = var.ami_id
-  jenkins_security_group_id = module.jenkins.jenkins_sg_id
-}
-
-module "jenkins" {
-  source         = "../../modules/jenkins"
-  project_name   = var.project_name
-  env            = var.env
-  vpc_id         = module.vpc.vpc_id
-  vpc_cidr =  var.vpc_cidr
-  public_subnet  = module.vpc.public_subnets[0]
-  key_name       = var.key_name
-  allowed_cidr   = var.allowed_admin_cidr
-  instance_type  = var.jenkins_instance_type
-  ami_id         = var.ami_id
-  iam_instance_profile_name = var.jenkins_iam_instance_profile_name
-}
-
-module "sonarqube" {
-  source         = "../../modules/sonarqube"
-  project_name   = var.project_name
-  env            = var.env
-  vpc_id         = module.vpc.vpc_id
-  subnet_id      = module.vpc.public_subnets[0]
-  key_name       = var.key_name
-  allowed_cidr   = var.allowed_admin_cidr
-  instance_type  = var.tool_instance_type
-  ami_id         = var.ami_id
-  bastion_security_group_id = module.bastion.bastion_sg_id
-  jenkins_security_group_id = module.jenkins.jenkins_sg_id
-}
-
-module "nexus" {
-  source         = "../../modules/nexus"
-  project_name   = var.project_name
-  env            = var.env
-  vpc_id         = module.vpc.vpc_id
-  subnet_id      = module.vpc.public_subnets[1]
-  key_name       = var.key_name
-  allowed_cidr   = var.allowed_admin_cidr
-  instance_type  = var.tool_instance_type
-  ami_id         = var.ami_id
-  bastion_security_group_id = module.bastion.bastion_sg_id
-  jenkins_security_group_id = module.jenkins.jenkins_sg_id
-   app_security_group_id = module.asg.app_security_group_id
+  source           = "../../modules/bastion"
+  project_name     = var.project_name
+  env              = var.env
+  vpc_id           = module.vpc.vpc_id
+  public_subnet    = module.vpc.public_subnets[0]
+  key_name         = var.key_name
+  instance_type    = var.bastion_instance_type
+  ami_id           = var.ami_id
+   allowed_ssh_cidrs = concat(
+    var.allowed_admin_cidrs,
+    ["${data.terraform_remote_state.stage.outputs.jenkins_public_ip}/32"]
+  )
 }
 
 module "acm" {
@@ -134,20 +103,6 @@ output "bastion_private_ip" {
   value = module.bastion.bastion_private_ip
 }
 
-output "jenkins_url" {
-  value = module.jenkins.jenkins_url
-}
-
-output "sonarqube_url" {
-  value = module.sonarqube.sonarqube_url
-}
-
-output "nexus_url" {
-  value = module.nexus.nexus_url
-}
-output "nexus_docker_registry" {
-  value = module.nexus.nexus_docker_registry
-}
 output "application_url" {
   value = "https://${var.domain_name}"
 }

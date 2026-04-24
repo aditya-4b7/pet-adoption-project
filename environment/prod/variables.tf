@@ -3,7 +3,7 @@ variable "project_name" { type = string }
 variable "env" { type = string }
 variable "key_name" { type = string }
 variable "domain_name" { type = string }
-variable "allowed_admin_cidr" { type = string }
+variable "allowed_admin_cidrs" { type = list(string) }
 variable "ami_id" { type = string }
 variable "jenkins_instance_type" { type = string }
 variable "tool_instance_type" { type = string }
@@ -21,3 +21,15 @@ variable "az_2" { type = string }
 variable "bastion_instance_type" { type = string }
 variable "hosted_zone_id" { type = string }
 variable "jenkins_iam_instance_profile_name" { type = string }
+variable "stage_state_bucket" {
+  type = string
+}
+
+variable "stage_state_key" {
+  type = string
+}
+
+variable "stage_state_region" {
+  type = string
+  default = "us-east-1"
+}

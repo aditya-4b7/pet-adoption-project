@@ -2,16 +2,17 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'TERRAFORM_ENV', choices: ['stage', 'prod'], description: 'Environment folder under environment/')
+        choice(name: 'TERRAFORM_ENV', choices: ['stage', 'prod'], description: 'Target environment to deploy')
+        choice(name: 'TOOLS_ENV', choices: ['stage'], description: 'Environment where shared Jenkins/Nexus/SonarQube live')
         string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region used by Terraform and discovery script')
         booleanParam(name: 'ENABLE_NEW_RELIC', defaultValue: false, description: 'Install New Relic infrastructure agent on app nodes after deploy')
     }
 
     environment {
-        APP_NAME       = 'pet-adoption'
-        APP_VERSION    = "${env.BUILD_NUMBER}"
-        SONARQUBE_ENV  = 'sonarqube'
-        DOCKER_IMAGE   = 'pet-adoption'
+        APP_NAME      = 'pet-adoption'
+        APP_VERSION   = "${env.BUILD_NUMBER}"
+        SONARQUBE_ENV = 'sonarqube'
+        DOCKER_IMAGE  = 'pet-adoption'
     }
 
     tools {
@@ -26,15 +27,11 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Prepare Workspace') {
-            steps {
-                sh 'mkdir -p reports'
-            }
+            steps { sh 'mkdir -p reports' }
         }
 
         stage('Read Terraform Outputs') {
@@ -44,6 +41,7 @@ pipeline {
                         cd ${WORKSPACE}
                         chmod +x scripts/init-env.sh
                         ./scripts/init-env.sh ${params.TERRAFORM_ENV}
+                        ./scripts/init-env.sh ${params.TOOLS_ENV}
                     """
 
                     dir("environment/${params.TERRAFORM_ENV}") {
@@ -52,10 +50,29 @@ pipeline {
                         env.ASG_NAME = sh(script: '/usr/local/bin/terraform output -raw asg_name', returnStdout: true).trim()
                         env.BASTION_PUBLIC_IP = sh(script: '/usr/local/bin/terraform output -raw bastion_public_ip', returnStdout: true).trim()
                         env.BASTION_PRIVATE_IP = sh(script: '/usr/local/bin/terraform output -raw bastion_private_ip', returnStdout: true).trim()
-                        env.NEXUS_URL = sh(script: '/usr/local/bin/terraform output -raw nexus_url', returnStdout: true).trim()
-                        env.NEXUS_REGISTRY = sh(script: '/usr/local/bin/terraform output -raw nexus_docker_registry', returnStdout: true).trim()
                         env.APPLICATION_URL = sh(script: '/usr/local/bin/terraform output -raw application_url', returnStdout: true).trim()
                     }
+
+                    dir("environment/${params.TOOLS_ENV}") {
+                        sh '/usr/local/bin/terraform init -reconfigure -backend-config=backend.auto.hcl'
+
+                        env.NEXUS_URL = sh(script: '/usr/local/bin/terraform output -raw nexus_url', returnStdout: true).trim()
+                        env.NEXUS_REGISTRY = sh(script: '/usr/local/bin/terraform output -raw nexus_docker_registry', returnStdout: true).trim()
+                    }
+
+                    if (params.TERRAFORM_ENV == params.TOOLS_ENV) {
+                        env.BASTION_JUMP_IP = env.BASTION_PRIVATE_IP
+                    } else {
+                        env.BASTION_JUMP_IP = env.BASTION_PUBLIC_IP
+                    }
+
+                    echo "Target env: ${params.TERRAFORM_ENV}"
+                    echo "Tools env: ${params.TOOLS_ENV}"
+                    echo "ASG: ${env.ASG_NAME}"
+                    echo "Bastion jump IP: ${env.BASTION_JUMP_IP}"
+                    echo "Nexus URL: ${env.NEXUS_URL}"
+                    echo "Nexus Registry: ${env.NEXUS_REGISTRY}"
+                    echo "Application URL: ${env.APPLICATION_URL}"
                 }
             }
         }
@@ -151,7 +168,7 @@ pipeline {
                     ansible-playbook -i ansible/inventory.ini \
                       --private-key /var/lib/jenkins/.ssh/my_key.pem \
                       -u ec2-user \
-                      --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_PRIVATE_IP}'" \
+                      --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_JUMP_IP}'" \
                       ansible/docker.yml
                 '''
             }
@@ -173,7 +190,7 @@ pipeline {
                             ansible-playbook -i ansible/inventory.ini \
                               --private-key /var/lib/jenkins/.ssh/my_key.pem \
                               -u ec2-user \
-                              --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_PRIVATE_IP}'" \
+                              --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_JUMP_IP}'" \
                               ansible/deploy.yml \
                               --extra-vars "nexus_registry=${NEXUS_REGISTRY} nexus_username=${NEXUS_USER} nexus_password=${NEXUS_PASS} image_name=${DOCKER_IMAGE} image_tag=${APP_VERSION} newrelic_license_key='${nrKey}' newrelic_app_name=${APP_NAME}-${params.TERRAFORM_ENV}"
                         """
@@ -193,7 +210,7 @@ pipeline {
                         ansible-playbook -i ansible/inventory.ini \
                           --private-key /var/lib/jenkins/.ssh/my_key.pem \
                           -u ec2-user \
-                          --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_PRIVATE_IP}'" \
+                          --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand='ssh -i /var/lib/jenkins/.ssh/my_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p ec2-user@${BASTION_JUMP_IP}'" \
                           ansible/newrelic.yml \
                           --extra-vars "newrelic_license_key=${NEW_RELIC_LICENSE_KEY}"
                     """
