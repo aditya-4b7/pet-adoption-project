@@ -86,13 +86,28 @@ pipeline {
         }
 
         stage('Trivy FS Scan') {
-            steps {
-                    sh '''
-                mkdir -p reports
-                trivy fs --format table -o reports/trivy-fs.txt .
-            '''
+        steps {
+            dir('app') {
+                sh '''
+                    mkdir -p ../reports
+
+                    trivy fs \
+                    --severity HIGH,CRITICAL \
+                    --no-progress \
+                    --format table \
+                    --output ../reports/trivy-fs-table.txt \
+                    .
+
+                    trivy fs \
+                    --severity HIGH,CRITICAL \
+                    --no-progress \
+                    --format json \
+                    --output ../reports/trivy-fs.json \
+                    .
+                '''
             }
         }
+    }
 
         stage('SonarQube Scan') {
             steps {
@@ -137,17 +152,27 @@ pipeline {
             }
         }
 
-        stage('Trivy Image Scan') {
-                steps {
-                    sh '''
+            stage('Trivy Image Scan') {
+        steps {
+            sh '''
                 mkdir -p reports
-                trivy image --severity HIGH,CRITICAL \
+
+                trivy image \
+                --severity HIGH,CRITICAL \
+                --no-progress \
                 --format table \
-                -o reports/trivy-image.txt \
+                --output reports/trivy-image-table.txt \
+                ${DOCKER_IMAGE}:${APP_VERSION}
+
+                trivy image \
+                --severity HIGH,CRITICAL \
+                --no-progress \
+                --format json \
+                --output reports/trivy-image.json \
                 ${DOCKER_IMAGE}:${APP_VERSION}
             '''
-            }
         }
+    }
 
         stage('Push Docker Image to Nexus') {
             steps {
@@ -240,7 +265,7 @@ pipeline {
             echo 'Pipeline failed.'
         }
         always {
-            archiveArtifacts artifacts: 'reports/*.txt, app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
+           archiveArtifacts artifacts: 'reports/*.txt, reports/*.json, app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
         }
     }
 }
