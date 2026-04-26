@@ -35,6 +35,43 @@ module "vpc" {
   az_1                  = var.az_1
   az_2                  = var.az_2
 }
+resource "aws_vpc_peering_connection" "stage_prod" {
+  vpc_id      = data.terraform_remote_state.stage.outputs.vpc_id
+  peer_vpc_id = module.vpc.vpc_id
+  auto_accept = true
+
+  tags = {
+    Name        = "${var.project_name}-stage-prod-peering"
+    Environment = var.env
+    Project     = var.project_name
+  }
+}
+
+resource "aws_route" "stage_public_to_prod" {
+  route_table_id            = data.terraform_remote_state.stage.outputs.public_route_table_id
+  destination_cidr_block    = var.vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.stage_prod.id
+}
+
+resource "aws_route" "stage_private_to_prod" {
+  count                     = length(data.terraform_remote_state.stage.outputs.private_route_table_ids)
+  route_table_id            = data.terraform_remote_state.stage.outputs.private_route_table_ids[count.index]
+  destination_cidr_block    = var.vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.stage_prod.id
+}
+
+resource "aws_route" "prod_public_to_stage" {
+  route_table_id            = module.vpc.public_route_table_id
+  destination_cidr_block    = data.terraform_remote_state.stage.outputs.vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.stage_prod.id
+}
+
+resource "aws_route" "prod_private_to_stage" {
+  count                     = length(module.vpc.private_route_table_ids)
+  route_table_id            = module.vpc.private_route_table_ids[count.index]
+  destination_cidr_block    = data.terraform_remote_state.stage.outputs.vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.stage_prod.id
+}
 
 module "bastion" {
   source           = "../../modules/bastion"

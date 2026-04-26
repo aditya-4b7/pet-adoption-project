@@ -87,9 +87,10 @@ pipeline {
 
         stage('Trivy FS Scan') {
             steps {
-                dir('app') {
-                    sh 'trivy fs --severity HIGH,CRITICAL --no-progress . || true'
-                }
+                    sh '''
+                mkdir -p reports
+                trivy fs --format table -o reports/trivy-fs.txt .
+            '''
             }
         }
 
@@ -137,8 +138,14 @@ pipeline {
         }
 
         stage('Trivy Image Scan') {
-            steps {
-                sh 'trivy image --severity HIGH,CRITICAL --no-progress ${DOCKER_IMAGE}:${APP_VERSION} || true'
+                steps {
+                    sh '''
+                mkdir -p reports
+                trivy image --severity HIGH,CRITICAL \
+                --format table \
+                -o reports/trivy-image.txt \
+                ${DOCKER_IMAGE}:${APP_VERSION}
+            '''
             }
         }
 
@@ -233,7 +240,7 @@ pipeline {
             echo 'Pipeline failed.'
         }
         always {
-            archiveArtifacts artifacts: 'app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'reports/*.txt, app/target/*.war, ansible/inventory.ini', allowEmptyArchive: true
         }
     }
 }

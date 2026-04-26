@@ -43,6 +43,12 @@ resource "aws_security_group" "nexus" {
         security_groups = [var.app_security_group_id]
       }
       
+        ingress {
+    from_port   = 8082
+    to_port     = 8082
+    protocol    = "tcp"
+    cidr_blocks = ["10.20.0.0/16"]
+  }
     egress { 
       from_port = 0 
       to_port = 0 

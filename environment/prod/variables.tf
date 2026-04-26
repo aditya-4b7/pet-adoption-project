@@ -3,6 +3,9 @@ variable "project_name" { type = string }
 variable "env" { type = string }
 variable "key_name" { type = string }
 variable "domain_name" { type = string }
+variable "allowed_admin_cidr" {
+  type = string
+}
 variable "allowed_admin_cidrs" { type = list(string) }
 variable "ami_id" { type = string }
 variable "jenkins_instance_type" { type = string }

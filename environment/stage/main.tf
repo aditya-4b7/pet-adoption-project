@@ -33,7 +33,7 @@ module "bastion" {
   vpc_id            = module.vpc.vpc_id
   public_subnet     = module.vpc.public_subnets[0]
   key_name          = var.key_name
-  allowed_ssh_cidr  = var.allowed_admin_cidr
+  allowed_ssh_cidrs  = var.allowed_admin_cidrs
   instance_type     = var.bastion_instance_type
   ami_id            = var.ami_id
   jenkins_security_group_id = module.jenkins.jenkins_sg_id
@@ -159,4 +159,20 @@ output "application_url" {
 
 output "asg_name" {
   value = module.asg.asg_name
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+
+output "vpc_cidr" {
+  value = var.vpc_cidr
+}
+
+output "public_route_table_id" {
+  value = module.vpc.public_route_table_id
+}
+
+output "private_route_table_ids" {
+  value = module.vpc.private_route_table_ids
 }
