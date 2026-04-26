@@ -1,60 +1,150 @@
-# End-to-End DevOps Project: Containerized Java Application on AWS
+# 🚀 End-to-End DevOps Project: Containerized Java Application on AWS
 
-This repository deploys a containerized Java web application through a Jenkins CI/CD pipeline into a robust, scalable, high-availability AWS environment provisioned by Terraform. It implements the requirement for an Ansible auto-discovery bash script that builds inventory from the private IP addresses of instances currently running in the Auto Scaling Group.
+This repository provisions and deploys a **containerized Java web application** using a fully automated DevOps pipeline. It implements a **production-grade multi-environment architecture (Stage + Prod)** with secure networking, CI/CD, monitoring, and security scanning.
 
-## Technologies Used
-- AWS: VPC, EC2, Auto Scaling Group, ALB, Route53, ACM, S3, DynamoDB
-- GitHub: source control and collaboration
-- Terraform: infrastructure provisioning
-- Jenkins: CI/CD orchestration
-- Ansible: bootstrap and deployment automation
-- Docker: application packaging and runtime
-- SonarQube: code quality analysis
-- Nexus: artifact repository for WAR files
-- Bastion Host: SSH jump host into private application instances
-- New Relic: optional infrastructure monitoring on app nodes
-- Tomcat: application server in the Docker image
-- Maven: Java build and packaging
-- Java 21: build and runtime base
-- Trivy: container vulnerability scanning
-- OWASP Dependency Check: dependency vulnerability scanning
+The project also fulfills the requirement of an **Ansible auto-discovery script**, dynamically building inventory from private IPs of instances in the Auto Scaling Group.
 
-## What This Repo Provisions
-- VPC with 2 public and 2 private subnets across 2 AZs
-- Internet Gateway, NAT Gateway, public and private route tables
-- Bastion host in a public subnet
-- Jenkins server in a public subnet
-- SonarQube server in a public subnet
-- Nexus server in a public subnet
-- Route53 hosted zone
-- ACM certificate validated by DNS
-- Application Load Balancer with HTTP to HTTPS redirect
-- Application Auto Scaling Group in private subnets
-- Security groups that restrict app access to the ALB and bastion
+---
 
-## What This Repo Deploys
-- Maven-built WAR
-- Docker image containing Tomcat and the WAR
-- Nexus artifact upload
-- Trivy and OWASP scans in Jenkins
-- Ansible bootstrap of Docker on app nodes
-- Ansible deployment to the private ASG nodes through the bastion host
-- Optional New Relic infrastructure agent installation on app nodes
+## 🏗️ Architecture Overview
 
-## Files That Require Your Real Values
-These cannot be guessed safely because they depend on your account and your environment:
-- `environment/stage/terraform.tfvars`
-- `environment/prod/terraform.tfvars`
+### 🔹 Stage Environment (Tools VPC - 10.10.0.0/16)
 
-Set these before applying Terraform:
-- `key_name`: name of an EC2 key pair that already exists in your AWS account
-- `domain_name`: a real domain you control so ACM DNS validation succeeds
-- `allowed_admin_cidr`: your public IP in CIDR format, such as `1.2.3.4/32`
+* Jenkins (CI/CD)
+* Nexus (Docker + artifact repository)
+* SonarQube (code quality)
+* Bastion host
 
-## Backend State Handling
-The backend bucket names do not require manual placeholders anymore.
+### 🔹 Production Environment (App VPC - 10.20.0.0/16)
 
-Run:
+* Auto Scaling Group (private app nodes)
+* Application Load Balancer (ALB)
+* Route53 + ACM (domain + HTTPS)
+* Bastion host
+
+### 🔹 Networking
+
+* Separate VPCs for stage and prod
+* **VPC Peering** enables private communication (Prod → Stage Nexus)
+* No direct public access to application nodes
+
+---
+
+## 🛠️ Technologies Used
+
+* **AWS**: VPC, EC2, ASG, ALB, Route53, ACM, S3, DynamoDB, VPC Peering
+* **Terraform**: Infrastructure as Code
+* **Jenkins**: CI/CD orchestration
+* **Ansible**: Configuration & deployment
+* **Docker**: Application containerization
+* **Nexus**: Docker & artifact repository
+* **SonarQube**: Code quality analysis
+* **New Relic**: Infrastructure monitoring
+* **Trivy**: Security scanning (FS + image)
+* **Maven + Java 17/21**: Build system
+* **Tomcat**: Application runtime
+
+---
+
+## 📦 What This Repo Provisions
+
+* VPC with public and private subnets across 2 AZs (stage & prod)
+* Internet Gateway, NAT Gateway, route tables
+* Bastion host for secure SSH access
+* Jenkins, Nexus, SonarQube (stage only)
+* Application Load Balancer with HTTPS (ACM + Route53)
+* Auto Scaling Group for application nodes
+* **VPC Peering between stage and prod**
+* Security groups enforcing least-privilege access
+
+---
+
+## 🚀 What This Repo Deploys
+
+* Maven-built WAR file
+* Docker image (Tomcat + WAR)
+* Push to Nexus private registry
+* Dynamic Ansible inventory from ASG
+* Docker installation on private nodes
+* Application deployment via bastion
+* Optional New Relic agent installation
+* Trivy security scans with report generation
+
+---
+
+## 🔐 Security Design
+
+* App nodes run in **private subnets only**
+* Bastion host used for controlled SSH access
+* Security Group rules:
+
+  * Jenkins → Bastion (SSH)
+  * Bastion → App nodes (SSH)
+  * Prod → Nexus via VPC peering
+* No hardcoded credentials (Jenkins credentials used)
+
+---
+
+## 📊 CI/CD Pipeline (Jenkins)
+
+### Pipeline Flow
+
+1. Checkout source from GitHub
+2. Read Terraform outputs (stage/prod)
+3. Build WAR with Maven
+4. Run **Trivy FS scan**
+5. Run SonarQube analysis + Quality Gate
+6. Upload WAR to Nexus
+7. Build Docker image
+8. Run **Trivy image scan**
+9. Push Docker image to Nexus
+10. Generate dynamic Ansible inventory
+11. Bootstrap Docker on app nodes
+12. Deploy container via bastion
+13. Optionally install New Relic agent
+14. Run application smoke test
+
+---
+
+## 🛡️ Security Scanning (Trivy)
+
+### Filesystem Scan
+
+```bash
+trivy fs .
+```
+
+### Docker Image Scan
+
+```bash
+trivy image <image>
+```
+
+### Reports (Jenkins Artifacts)
+
+```text
+reports/trivy-fs.txt
+reports/trivy-image.txt
+```
+
+---
+
+## 📈 Monitoring (New Relic)
+
+* Installed via Ansible on app nodes
+* Uses license key from Jenkins credentials
+* Tracks:
+
+  * CPU, Memory, Disk
+  * Host-level metrics
+* Visible in:
+
+  * **Infrastructure → Hosts**
+
+---
+
+## ⚙️ Backend State Handling
+
 ```bash
 chmod +x scripts/*.sh
 ./scripts/create-backend.sh us-east-1 pet-adoption
@@ -62,47 +152,103 @@ chmod +x scripts/*.sh
 ./scripts/init-env.sh prod
 ```
 
-The script automatically:
-- reads your AWS account ID
-- creates unique S3 bucket names for stage and prod
-- creates DynamoDB lock tables
-- writes `environment/<env>/backend.auto.hcl`
+This automatically:
 
-## Terraform Apply
-Stage:
+* Creates S3 backend buckets
+* Creates DynamoDB lock tables
+* Generates `backend.auto.hcl`
+
+---
+
+## 🚀 Terraform Apply
+
+### Stage (Tools)
+
 ```bash
 cd environment/stage
 terraform apply -auto-approve
 ```
 
-Prod:
+### Prod (Application)
+
 ```bash
 cd environment/prod
 terraform apply -auto-approve
 ```
 
-## Jenkins Setup Summary
-Configure these Jenkins tools:
-- JDK named `jdk21`
-- Maven named `maven3`
+---
 
-Configure these Jenkins credentials:
-- `ssh-private-key`: private key matching `key_name`
-- `nexus-creds`: username and password for Nexus
-- `newrelic-license-key`: optional secret text credential for New Relic
+## 🔧 Jenkins Setup
 
-## Pipeline Flow
-1. Checkout source from GitHub
-2. Read Terraform outputs from the selected environment
-3. Build WAR with Maven
-4. Run OWASP Dependency Check
-5. Run SonarQube analysis and quality gate
-6. Upload WAR to Nexus
-7. Build Docker image
-8. Run Trivy scan
-9. Save Docker image as tarball
-10. Generate Ansible inventory from ASG private IPs
-11. Bootstrap Docker on app nodes through the bastion host
-12. Deploy the new image to app nodes through the bastion host
-13. Optionally install New Relic infrastructure agent
-14. Run an HTTPS smoke test against the application domain
+### Tools
+
+* JDK: `jdk21`
+* Maven: `maven3`
+
+### Credentials
+
+* `ssh-private-key` → EC2 key pair
+* `nexus-creds` → Nexus login
+* `newrelic-license-key` → New Relic license key
+
+---
+
+## 📂 Files That Require Real Values
+
+Set in:
+
+```text
+environment/stage/terraform.tfvars
+environment/prod/terraform.tfvars
+```
+
+Required variables:
+
+* `key_name`
+* `domain_name`
+* `allowed_admin_cidrs` (list of CIDRs)
+
+---
+
+## ⚠️ Key Challenges Solved
+
+| Challenge                 | Solution                            |
+| ------------------------- | ----------------------------------- |
+| Jenkins disk full         | Attached EBS & moved `JENKINS_HOME` |
+| SSH failures              | Fixed SG rules & bastion forwarding |
+| Prod → Nexus unreachable  | Implemented VPC peering             |
+| Terraform inconsistencies | Standardized variables              |
+| New Relic not reporting   | Correct license key usage           |
+| Pipeline failures         | Resource + config fixes             |
+
+---
+
+## 🌐 Outputs
+
+### Stage
+
+* Jenkins URL
+* Nexus Registry
+* SonarQube URL
+
+### Prod
+
+* Application URL
+* Bastion IP
+* ASG Name
+
+---
+
+## 🚀 Future Improvements
+
+* Blue/Green deployments
+* Kubernetes migration
+* Slack notifications
+* Advanced alerting (New Relic)
+* Multi-region deployment
+
+---
+
+## 👨‍💻 Author
+
+Gokul Parise
